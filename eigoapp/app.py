@@ -77,7 +77,7 @@ if st.session_state.status == 'setting':
 # --- 3: テスト画面 ---
 elif st.session_state.status == 'testing':
     q = st.session_state.test_list[st.session_state.current_idx]
-    st.title("📖 チェックテスト")
+    st.title("📖 テスト")
     
     # 画面を「左：メイン表示（8）」と「右：操作ボタン（2）」に分割
     col_main, col_ctrl = st.columns([8, 2])
