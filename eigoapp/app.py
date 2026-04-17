@@ -252,7 +252,17 @@ elif st.session_state.status == "result":
    with cr:
        st.subheader("× (要練習)")
        for i in res["×"]: st.write(f"・{i['english']} : {i['japanese']}")
-
+          
+   st.write("---")
+   retry = res["△"] + res["×"]
+   if retry and st.button("🔄 不安な単語を再テスト", type="primary"):
+       st.session_state.test_list = random.sample(retry, len(retry))
+       st.session_state.current_idx = 0
+       st.session_state.results = {"〇": [], "△": [], "×": []}
+       st.session_state.history = []
+       st.session_state.start_time = time.time()
+       st.session_state.status = "testing"
+       st.rerun()
    if st.button("🏠 最初に戻る"):
        st.session_state.clear()
        st.rerun()
