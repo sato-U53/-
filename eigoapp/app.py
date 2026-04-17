@@ -69,7 +69,7 @@ def keyboard_handler():
    )
 
 # =====================================
-# CSS（スマホ横並び対応版）
+# CSS（スマホ強制横並び版）
 # =====================================
 st.markdown(
    """
@@ -81,25 +81,26 @@ st.markdown(
 .timer-text { font-size: 1.6rem; font-weight: bold; color: #e63946; text-align: center; }
 .grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
 
-/* ===== スマホで判定ボタンを横並びにする魔法のCSS ===== */
-[data-testid="column"]:has(button[kind="secondary"]):has(span:contains("〇")),
-[data-testid="column"]:has(button[kind="secondary"]):has(span:contains("△")),
-[data-testid="column"]:has(button[kind="secondary"]):has(span:contains("×")) {
-   flex: 1 !important;
-   min-width: 0 !important;
-}
-
+/* ===== スマホ判定ボタン強制横並び用CSS ===== */
+/* 横並びにするコンテナ(stHorizontalBlock)を特定してFlexbox化 */
 div[data-testid="stHorizontalBlock"]:has(button:contains("〇")) {
    display: flex !important;
    flex-direction: row !important;
-   flex-wrap: nowrap !important;
-   gap: 8px !important;
+   width: 100% !important;
+   gap: 10px !important;
+}
+
+/* 個別のカラム幅を均等にする */
+div[data-testid="stHorizontalBlock"]:has(button:contains("〇")) div[data-testid="column"] {
+   width: calc(33.33% - 7px) !important;
+   flex: 1 1 0% !important;
+   min-width: 0 !important;
 }
 
 @media (max-width: 768px) {
    .word-box { padding: 16px; }
    .word-box h1 { font-size: 1.8rem; }
-   .stButton>button { height: 2.8em; font-size: 16px; }
+   .stButton>button { height: 3.5em; font-size: 18px; } /* スマホでもボタンを大きく */
    .answer-spacer { height: 40px; }
 }
 </style>
@@ -189,9 +190,9 @@ elif st.session_state.status == "testing":
            st.markdown("<div class='answer-spacer'></div>", unsafe_allow_html=True)
 
    with col_ctrl:
-       st.button("🔊 音声 (I)", on_click=lambda: speak(q["english"]))
+       st.button("🔊 音声", on_click=lambda: speak(q["english"]))
        if not st.session_state.show_ans:
-           if st.button("👁️ 答え (O)", type="primary"):
+           if st.button("👁️ 答え", type="primary"):
                st.session_state.show_ans = True
                st.rerun()
        if has_hint and not st.session_state.show_hint:
@@ -200,7 +201,7 @@ elif st.session_state.status == "testing":
                st.rerun()
 
        st.write("---")
-       # ★ ここが横並びになる部分
+       # 判定ボタン。CSSでこの親要素をFlexbox(row)に固定しています
        c1, c2, c3 = st.columns(3)
        if c1.button("〇"):
            st.session_state.history.append("〇")
