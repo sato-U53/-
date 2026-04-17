@@ -45,7 +45,6 @@ def keyboard_handler():
            const buttons = Array.from(doc.querySelectorAll('button'));
            const target = buttons.find(btn => {
                const text = btn.innerText || "";
-               // 〇△×は完全一致、それ以外は含むかどうかで判定
                if (['〇', '△', '×'].includes(label)) {
                    return text.trim() === label;
                }
@@ -70,7 +69,7 @@ def keyboard_handler():
    )
 
 # =====================================
-# CSS
+# CSS（スマホ横並び対応版）
 # =====================================
 st.markdown(
    """
@@ -82,6 +81,27 @@ st.markdown(
 .timer-text { font-size: 1.6rem; font-weight: bold; color: #e63946; text-align: center; }
 .grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
 
+/* ===== スマホで判定ボタンを横並びにする魔法のCSS ===== */
+[data-testid="column"]:has(button[kind="secondary"]):has(span:contains("〇")),
+[data-testid="column"]:has(button[kind="secondary"]):has(span:contains("△")),
+[data-testid="column"]:has(button[kind="secondary"]):has(span:contains("×")) {
+   flex: 1 !important;
+   min-width: 0 !important;
+}
+
+div[data-testid="stHorizontalBlock"]:has(button:contains("〇")) {
+   display: flex !important;
+   flex-direction: row !important;
+   flex-wrap: nowrap !important;
+   gap: 8px !important;
+}
+
+@media (max-width: 768px) {
+   .word-box { padding: 16px; }
+   .word-box h1 { font-size: 1.8rem; }
+   .stButton>button { height: 2.8em; font-size: 16px; }
+   .answer-spacer { height: 40px; }
+}
 </style>
 """,
    unsafe_allow_html=True
@@ -154,7 +174,6 @@ elif st.session_state.status == "testing":
    t_col2.markdown(f"<div class='timer-text'>⏳ {elapsed}s</div>", unsafe_allow_html=True)
    st.progress((idx + 1) / total_q)
 
-   # ヒントの有無を確認
    hint_val = str(q.get("hint", "")).strip()
    has_hint = (hint_val != "" and hint_val.lower() != "nan")
 
@@ -162,31 +181,26 @@ elif st.session_state.status == "testing":
 
    with col_main:
        st.markdown(f"<div class='word-box'><h1>{q['english']}</h1></div>", unsafe_allow_html=True)
-
        if st.session_state.show_hint and has_hint:
            st.markdown(f"<div class='hint-box'>{hint_val}</div>", unsafe_allow_html=True)
-
        if st.session_state.show_ans:
            st.markdown(f"<div class='word-box' style='background-color:#e3f2fd;'><h2>{q['japanese']}</h2></div>", unsafe_allow_html=True)
        else:
            st.markdown("<div class='answer-spacer'></div>", unsafe_allow_html=True)
 
    with col_ctrl:
-       st.button("🔊 音声", on_click=lambda: speak(q["english"]))
-
+       st.button("🔊 音声 (I)", on_click=lambda: speak(q["english"]))
        if not st.session_state.show_ans:
-           if st.button("👁️ 答え", type="primary"):
+           if st.button("👁️ 答え (O)", type="primary"):
                st.session_state.show_ans = True
                st.rerun()
-
-       # ヒントボタン（ある時だけ表示）
        if has_hint and not st.session_state.show_hint:
            if st.button("💡 ヒント"):
                st.session_state.show_hint = True
                st.rerun()
 
        st.write("---")
-       # 判定
+       # ★ ここが横並びになる部分
        c1, c2, c3 = st.columns(3)
        if c1.button("〇"):
            st.session_state.history.append("〇")
@@ -221,7 +235,6 @@ elif st.session_state.status == "testing":
            st.session_state.show_ans = st.session_state.show_hint = False
            st.session_state.start_time = time.time()
            st.rerun()
-
        if st.button("中止"):
            st.session_state.status = "result"
            st.rerun()
