@@ -5,6 +5,8 @@ import os
 from gtts import gTTS
 import base64
 import uuid
+import time
+import streamlit.components.v1 as components
 
 # =====================================
 # ページ設定
@@ -19,89 +21,70 @@ def speak(text: str):
    try:
        tts = gTTS(text=text, lang="en")
        tts.save(filename)
-
        with open(filename, "rb") as f:
            b64 = base64.b64encode(f.read()).decode("utf-8")
-
-       html = f"""
-       <audio autoplay="true">
-           <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-       </audio>
-       """
+       html = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
        st.markdown(html, unsafe_allow_html=True)
-
    except Exception as e:
-       st.error(f"音声生成に失敗しました: {e}")
-
+       st.error(f"音声生成エラー: {e}")
    finally:
        if os.path.exists(filename):
-           try:
-               os.remove(filename)
-           except:
-               pass
+           try: os.remove(filename)
+           except: pass
 
 # =====================================
-# 共通CSS
+# 強力なキーボード操作用JavaScript
+# =====================================
+def keyboard_handler():
+   components.html(
+       """
+       <script>
+       const doc = window.parent.document;
+
+       function pressButton(label) {
+           const buttons = Array.from(doc.querySelectorAll('button'));
+           const target = buttons.find(btn => {
+               const text = btn.innerText || "";
+               // 〇△×は完全一致、それ以外は含むかどうかで判定
+               if (['〇', '△', '×'].includes(label)) {
+                   return text.trim() === label;
+               }
+               return text.includes(label);
+           });
+           if (target) {
+               target.click();
+           }
+       }
+
+       doc.onkeydown = function(e) {
+           const key = e.key.toLowerCase();
+           if (key === 'i') pressButton('🔊');
+           if (key === 'o') pressButton('👁️');
+           if (key === 'j') pressButton('〇');
+           if (key === 'k') pressButton('△');
+           if (key === 'l') pressButton('×');
+       };
+       </script>
+       """,
+       height=0
+   )
+
+# =====================================
+# CSS
 # =====================================
 st.markdown(
    """
 <style>
-.word-box {
-   background-color: #f0f2f6;
-   padding: 30px;
-   border-radius: 15px;
-   text-align: center;
-   margin-bottom: 10px;
-   border: 2px solid #ddd;
-}
-.hint-box {
-   background-color: #fff3cd;
-   padding: 15px;
-   border-radius: 10px;
-   text-align: center;
-   margin-bottom: 20px;
-   color: #856404;
-}
-.stButton>button {
-   height: 3em;
-   font-size: 18px;
-   border-radius: 10px;
-   width: 100%;
-}
-.answer-spacer {
-   height: 100px;
-}
-.progress-text {
-   font-size: 1.2rem;
-   font-weight: bold;
-   text-align: right;
-   color: #555;
-}
-.grid-header {
-   font-size: 24px;
-   font-weight: 800;
-   margin: 8px 0 10px 0;
-}
-.grid-container {
-   display: grid;
-   grid-template-columns: 1fr;
-   gap: 8px;
-}
-.grid-item {
-   background: #f8f9fa;
-   border: 1px solid #e5e7eb;
-   padding: 10px;
-   border-radius: 10px;
-}
+.word-box { background-color: #f0f2f6; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 10px; border: 2px solid #ddd; }
+.hint-box { background-color: #fff3cd; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; color: #856404; }
+.stButton>button { height: 3.2em; font-size: 18px; border-radius: 10px; width: 100%; font-weight: bold; }
+.answer-spacer { height: 100px; }
+.timer-text { font-size: 1.6rem; font-weight: bold; color: #e63946; text-align: center; }
+.grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
 
 @media (max-width: 768px) {
-   .block-container { padding: 0.6rem 0.8rem !important; }
-   .word-box { padding: 16px; margin-bottom: 6px; }
-   .word-box h1 { font-size: 1.8rem; margin: 0.4rem 0; }
-   .word-box h2 { font-size: 1.15rem; margin: 0.3rem 0; }
-   .hint-box { padding: 8px; font-size: 0.92rem; }
-   .stButton>button { height: 2.55em; font-size: 16px; }
-   .answer-spacer { height: 26px !important; }
+   .word-box { padding: 16px; }
+   .word-box h1 { font-size: 1.8rem; }
 }
 </style>
 """,
@@ -114,162 +97,174 @@ st.markdown(
 if "status" not in st.session_state:
    st.session_state.status = "setting"
    st.session_state.results = {"〇": [], "△": [], "×": []}
+   st.session_state.history = []
 
 # =====================================
-# 1&2: 設定画面
+# 設定画面
 # =====================================
 if st.session_state.status == "setting":
-   st.title("📚 チェックテスト")
-
+   st.title("📚 単語テスト設定")
    book_options = {
-       "ターゲット1900": "taget1900(6).csv",
-       "ターゲット1400": "target1400.csv",
-       "ターゲット1200": "target1200.csv",
-       "ターゲット1000": "target1000.csv",
-       "システム英単語": "sis-tan.csv",
-       "LEAP": "leap.csv",
-       "LEAP(旧)": "leaped.csv",
-       "速読英単語必修編": "sokutan2.csv",
-       "速読英熟語": "sokuzyuku.csv",
-       "いろはにほへと": "いろはに.csv",
+       "ターゲット1900": "taget1900(6).csv", "ターゲット1400": "target1400.csv",
+       "ターゲット1200": "target1200.csv", "ターゲット1000": "target1000.csv",
+       "システム英単語": "sis-tan.csv", "LEAP": "leap.csv",
+       "LEAP(旧)": "leaped.csv", "速読英単語必修編": "sokutan2.csv",
+       "速読英熟語": "sokuzyuku.csv", "いろはにほへと": "いろはに.csv",
    }
-
    selected_book_name = st.selectbox("1: 本を選ぶ", list(book_options.keys()))
    csv_filename = book_options[selected_book_name]
 
-   st.write("2: テスト範囲指定")
    col1, col2 = st.columns(2)
    start_no = col1.number_input("開始番号", value=1, min_value=1)
    end_no = col2.number_input("終了番号", value=100, min_value=1)
 
-   if st.button("3: 単語テスト実行！"):
+   if st.button("テスト開始！"):
        try:
            current_dir = os.path.dirname(__file__)
            csv_path = os.path.join(current_dir, csv_filename)
            df = pd.read_csv(csv_path, names=["no", "english", "japanese", "hint"])
-
            df["hint"] = df["hint"].fillna("").astype(str).str.strip()
-           df.loc[df["hint"].str.lower() == "nan", "hint"] = ""
-
            mask = (df["no"] >= start_no) & (df["no"] <= end_no)
            target_words = df.loc[mask].to_dict("records")
 
            if not target_words:
-               st.error("その範囲に単語がありません！")
+               st.error("指定範囲に単語が見つかりません。")
            else:
                st.session_state.test_list = random.sample(target_words, len(target_words))
                st.session_state.current_idx = 0
                st.session_state.show_ans = False
                st.session_state.show_hint = False
-               st.session_state.results = {"〇": [], "△": [], "×": []} # リセット
+               st.session_state.results = {"〇": [], "△": [], "×": []}
+               st.session_state.history = []
+               st.session_state.start_time = time.time()
                st.session_state.status = "testing"
                st.rerun()
        except Exception as e:
-           st.error(f"エラー: {e}")
+           st.error(f"ファイル読み込みエラー: {e}")
 
 # =====================================
-# 3: テスト画面
+# テスト画面
 # =====================================
 elif st.session_state.status == "testing":
+   keyboard_handler()
+
    total_q = len(st.session_state.test_list)
-   curr_q = st.session_state.current_idx + 1
-   q = st.session_state.test_list[st.session_state.current_idx]
+   idx = st.session_state.current_idx
+   q = st.session_state.test_list[idx]
 
-   # 進捗表示
-   st.markdown(f"<div class='progress-text'>{curr_q} / {total_q}</div>", unsafe_allow_html=True)
-   st.progress(curr_q / total_q)
+   t_col1, t_col2 = st.columns([2, 1])
+   t_col1.write(f"**Progress: {idx + 1} / {total_q}**")
+   elapsed = int(time.time() - st.session_state.start_time)
+   t_col2.markdown(f"<div class='timer-text'>⏳ {elapsed}s</div>", unsafe_allow_html=True)
+   st.progress((idx + 1) / total_q)
 
-   hint_text = str(q.get("hint", "")).strip()
-   has_hint = (hint_text != "" and hint_text.lower() != "nan")
+   # ヒントの有無を確認
+   hint_val = str(q.get("hint", "")).strip()
+   has_hint = (hint_val != "" and hint_val.lower() != "nan")
 
-   col_main, col_ctrl = st.columns([8, 2])
+   col_main, col_ctrl = st.columns([7, 3])
 
    with col_main:
        st.markdown(f"<div class='word-box'><h1>{q['english']}</h1></div>", unsafe_allow_html=True)
+
        if st.session_state.show_hint and has_hint:
-           st.markdown(f"<div class='hint-box'>{hint_text}</div>", unsafe_allow_html=True)
+           st.markdown(f"<div class='hint-box'>{hint_val}</div>", unsafe_allow_html=True)
 
        if st.session_state.show_ans:
-           st.markdown(f"<div class='word-box' style='background-color:#e1f5fe;'><h2>{q['japanese']}</h2></div>", unsafe_allow_html=True)
+           st.markdown(f"<div class='word-box' style='background-color:#e3f2fd;'><h2>{q['japanese']}</h2></div>", unsafe_allow_html=True)
        else:
            st.markdown("<div class='answer-spacer'></div>", unsafe_allow_html=True)
 
    with col_ctrl:
-       if st.button("🔊 音声"):
-           speak(q["english"])
-       st.write("---")
+       st.button("🔊 音声", on_click=lambda: speak(q["english"]))
+
        if not st.session_state.show_ans:
-           if st.button("👁️ 答え"):
+           if st.button("👁️ 答え", type="primary"):
                st.session_state.show_ans = True
                st.rerun()
+
+       # ヒントボタン（ある時だけ表示）
        if has_hint and not st.session_state.show_hint:
-           if st.button("💡 一言"):
+           if st.button("💡 ヒント"):
                st.session_state.show_hint = True
                st.rerun()
-       st.write("---")
-
-       for icon in ["〇", "△", "×"]:
-           if st.button(icon):
-               st.session_state.results[icon].append(q)
-               st.session_state.current_idx += 1
-               st.session_state.show_ans = False
-               st.session_state.show_hint = False
-               if st.session_state.current_idx >= total_q:
-                   st.session_state.status = "result"
-               st.rerun()
 
        st.write("---")
+       # 判定
+       c1, c2, c3 = st.columns(3)
+       if c1.button("〇"):
+           st.session_state.history.append("〇")
+           st.session_state.results["〇"].append(q)
+           st.session_state.current_idx += 1
+           st.session_state.show_ans = st.session_state.show_hint = False
+           st.session_state.start_time = time.time()
+           if st.session_state.current_idx >= total_q: st.session_state.status = "result"
+           st.rerun()
+       if c2.button("△"):
+           st.session_state.history.append("△")
+           st.session_state.results["△"].append(q)
+           st.session_state.current_idx += 1
+           st.session_state.show_ans = st.session_state.show_hint = False
+           st.session_state.start_time = time.time()
+           if st.session_state.current_idx >= total_q: st.session_state.status = "result"
+           st.rerun()
+       if c3.button("×"):
+           st.session_state.history.append("×")
+           st.session_state.results["×"].append(q)
+           st.session_state.current_idx += 1
+           st.session_state.show_ans = st.session_state.show_hint = False
+           st.session_state.start_time = time.time()
+           if st.session_state.current_idx >= total_q: st.session_state.status = "result"
+           st.rerun()
+
+       st.write("---")
+       if idx > 0 and st.button("⬅️ 戻る"):
+           prev = st.session_state.history.pop()
+           st.session_state.results[prev].pop()
+           st.session_state.current_idx -= 1
+           st.session_state.show_ans = st.session_state.show_hint = False
+           st.session_state.start_time = time.time()
+           st.rerun()
+
        if st.button("中止"):
            st.session_state.status = "result"
            st.rerun()
 
 # =====================================
-# 4: 結果画面
+# 結果画面
 # =====================================
 elif st.session_state.status == "result":
-   st.title("📊 テスト結果")
-
-   # 正答率計算
+   st.title("📊 結果報告")
    res = st.session_state.results
-   total_answered = len(res["〇"]) + len(res["△"]) + len(res["×"])
+   total = sum(len(v) for v in res.values())
 
-   if total_answered > 0:
-       accuracy = (len(res["〇"]) / total_answered) * 100
-       st.metric("正答率 (〇のみ)", f"{accuracy:.1f}%")
-
-       # 簡易バーグラフ風表示
+   if total > 0:
+       acc = (len(res["〇"]) / total) * 100
+       st.metric("正答率", f"{acc:.1f}%")
        cols = st.columns(3)
        cols[0].info(f"〇: {len(res['〇'])}")
        cols[1].warning(f"△: {len(res['△'])}")
        cols[2].error(f"×: {len(res['×'])}")
 
    st.write("---")
-   col_left, col_right = st.columns(2)
-
-   with col_left:
-       st.markdown("<div class='grid-header'>△ (うろ覚え)</div>", unsafe_allow_html=True)
-       for i in res["△"]:
-           st.markdown(f"<div class='grid-item'>{i['english']} : {i['japanese']}</div>", unsafe_allow_html=True)
-       if not res["△"]: st.write("なし")
-
-   with col_right:
-       st.markdown("<div class='grid-header'>× (不正解)</div>", unsafe_allow_html=True)
-       for i in res["×"]:
-           st.markdown(f"<div class='grid-item'>{i['english']} : {i['japanese']}</div>", unsafe_allow_html=True)
-       if not res["×"]: st.write("なし")
+   cl, cr = st.columns(2)
+   with cl:
+       st.subheader("△ (復習)")
+       for i in res["△"]: st.markdown(f"<div class='grid-item'>{i['english']} : {i['japanese']}</div>", unsafe_allow_html=True)
+   with cr:
+       st.subheader("× (要練習)")
+       for i in res["×"]: st.markdown(f"<div class='grid-item'>{i['english']} : {i['japanese']}</div>", unsafe_allow_html=True)
 
    st.write("---")
-
-   # 再テストボタン
-   retry_list = res["△"] + res["×"]
-   if retry_list:
-       if st.button("🔄 △と×を再テストする", type="primary"):
-           st.session_state.test_list = random.sample(retry_list, len(retry_list))
-           st.session_state.current_idx = 0
-           st.session_state.results = {"〇": [], "△": [], "×": []}
-           st.session_state.status = "testing"
-           st.rerun()
-
-   if st.button("🏠 最初に戻る"):
+   retry = res["△"] + res["×"]
+   if retry and st.button("🔄 不安な単語を再テスト", type="primary"):
+       st.session_state.test_list = random.sample(retry, len(retry))
+       st.session_state.current_idx = 0
+       st.session_state.results = {"〇": [], "△": [], "×": []}
+       st.session_state.history = []
+       st.session_state.start_time = time.time()
+       st.session_state.status = "testing"
+       st.rerun()
+   if st.button("🏠 戻る"):
        st.session_state.clear()
        st.rerun()
