@@ -33,7 +33,7 @@ def speak(text: str):
            except: pass
 
 # =====================================
-# 強力なキーボード操作用JavaScript
+# キーボード操作用JavaScript
 # =====================================
 def keyboard_handler():
    components.html(
@@ -63,21 +63,35 @@ def keyboard_handler():
    )
 
 # =====================================
-# CSS
+# CSS（PC/スマホ両対応・判定ボタン固定）
 # =====================================
 st.markdown(
    """
 <style>
+/* 全般設定 */
 .word-box { background-color: #f0f2f6; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 10px; border: 2px solid #ddd; }
 .hint-box { background-color: #fff3cd; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; color: #856404; }
 .stButton>button { height: 3.2em; font-size: 18px; border-radius: 10px; width: 100%; font-weight: bold; }
-.answer-spacer { height: 100px; }
-.timer-text { font-size: 1.6rem; font-weight: bold; color: #e63946; text-align: center; }
-.grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
+.answer-spacer { height: 80px; }
+.timer-text { font-size: 1.4rem; font-weight: bold; color: #e63946; text-align: center; }
 
-/* スマホでのカラム強制維持設定 */
-[data-testid="column"] {
+/* ★ 判定ボタン（〇△×）を強制的に横並びにする設定 */
+div[data-testid="stHorizontalBlock"]:has(button:contains("〇")) {
+   display: flex !important;
+   flex-direction: row !important;
+   flex-wrap: nowrap !important;
+   width: 100% !important;
+   gap: 10px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(button:contains("〇")) div[data-testid="column"] {
+   flex: 1 !important;
    min-width: 0 !important;
+}
+
+@media (max-width: 768px) {
+   .word-box { padding: 16px; }
+   .word-box h1 { font-size: 1.8rem; }
+   .stButton>button { height: 3.5em; font-size: 18px; }
 }
 </style>
 """,
@@ -142,18 +156,18 @@ elif st.session_state.status == "testing":
    idx = st.session_state.current_idx
    q = st.session_state.test_list[idx]
 
-   # ヘッダー
+   # ヘッダー（進捗とタイマー）
    t1, t2 = st.columns([2, 1])
    t1.write(f"**Progress: {idx + 1} / {total_q}**")
    elapsed = int(time.time() - st.session_state.start_time)
    t2.markdown(f"<div class='timer-text'>⏳ {elapsed}s</div>", unsafe_allow_html=True)
    st.progress((idx + 1) / total_q)
 
-   # ヒントの有無
+   # ヒントの有無チェック
    hint_val = str(q.get("hint", "")).strip()
    has_hint = (hint_val != "" and hint_val.lower() != "nan")
 
-   # メイン表示
+   # メイン表示エリア
    st.markdown(f"<div class='word-box'><h1>{q['english']}</h1></div>", unsafe_allow_html=True)
    if st.session_state.show_hint and has_hint:
        st.markdown(f"<div class='hint-box'>{hint_val}</div>", unsafe_allow_html=True)
@@ -163,7 +177,7 @@ elif st.session_state.status == "testing":
    else:
        st.markdown("<div class='answer-spacer'></div>", unsafe_allow_html=True)
 
-   # 操作エリア
+   # 🔊 音声と 👁️ 答え（PCでは横並び、スマホでは縦に積まれてもOKな通常配置）
    c_voice, c_ans = st.columns(2)
    with c_voice:
        st.button("🔊 音声", on_click=lambda: speak(q["english"]))
@@ -175,46 +189,41 @@ elif st.session_state.status == "testing":
        else:
            st.button("✅ 表示中", disabled=True)
 
+   # ヒントボタン（ある時だけ表示）
    if has_hint and not st.session_state.show_hint:
-       if st.button("💡 ヒントを表示"):
-           st.session_state.show_hint = True
-           st.rerun()
+       st.button("💡 ヒントを表示", on_click=lambda: setattr(st.session_state, 'show_hint', True))
 
    st.write("---")
 
-   # ★ ここを修正：スマホでも横並びを崩さない設定
-   # 小さなリストで比率を固定することで、スマホでも1行に収めやすくなります
-   c1, c2, c3 = st.columns([1, 1, 1])
-   with c1:
-       if st.button("〇"):
-           st.session_state.history.append("〇")
-           st.session_state.results["〇"].append(q)
-           st.session_state.current_idx += 1
-           st.session_state.show_ans = st.session_state.show_hint = False
-           st.session_state.start_time = time.time()
-           if st.session_state.current_idx >= total_q: st.session_state.status = "result"
-           st.rerun()
-   with c2:
-       if st.button("△"):
-           st.session_state.history.append("△")
-           st.session_state.results["△"].append(q)
-           st.session_state.current_idx += 1
-           st.session_state.show_ans = st.session_state.show_hint = False
-           st.session_state.start_time = time.time()
-           if st.session_state.current_idx >= total_q: st.session_state.status = "result"
-           st.rerun()
-   with c3:
-       if st.button("×"):
-           st.session_state.history.append("×")
-           st.session_state.results["×"].append(q)
-           st.session_state.current_idx += 1
-           st.session_state.show_ans = st.session_state.show_hint = False
-           st.session_state.start_time = time.time()
-           if st.session_state.current_idx >= total_q: st.session_state.status = "result"
-           st.rerun()
+   # ★ 判定ボタン（〇△×）：CSSで強制横並び
+   c1, c2, c3 = st.columns(3)
+   if c1.button("〇"):
+       st.session_state.history.append("〇")
+       st.session_state.results["〇"].append(q)
+       st.session_state.current_idx += 1
+       st.session_state.show_ans = st.session_state.show_hint = False
+       st.session_state.start_time = time.time()
+       if st.session_state.current_idx >= total_q: st.session_state.status = "result"
+       st.rerun()
+   if c2.button("△"):
+       st.session_state.history.append("△")
+       st.session_state.results["△"].append(q)
+       st.session_state.current_idx += 1
+       st.session_state.show_ans = st.session_state.show_hint = False
+       st.session_state.start_time = time.time()
+       if st.session_state.current_idx >= total_q: st.session_state.status = "result"
+       st.rerun()
+   if c3.button("×"):
+       st.session_state.history.append("×")
+       st.session_state.results["×"].append(q)
+       st.session_state.current_idx += 1
+       st.session_state.show_ans = st.session_state.show_hint = False
+       st.session_state.start_time = time.time()
+       if st.session_state.current_idx >= total_q: st.session_state.status = "result"
+       st.rerun()
 
    st.write("---")
-   # 下部操作
+   # 中止と戻る（ここはPCで横並び、スマホで縦でもOK）
    b1, b2 = st.columns(2)
    with b1:
        if idx > 0 and st.button("⬅️ 戻る"):
@@ -243,11 +252,11 @@ elif st.session_state.status == "result":
    st.write("---")
    cl, cr = st.columns(2)
    with cl:
-       st.subheader("△")
-       for i in res["△"]: st.write(f"・{i['english']}")
+       st.subheader("△ (復習)")
+       for i in res["△"]: st.write(f"・{i['english']} : {i['japanese']}")
    with cr:
-       st.subheader("×")
-       for i in res["×"]: st.write(f"・{i['english']}")
+       st.subheader("× (要練習)")
+       for i in res["×"]: st.write(f"・{i['english']} : {i['japanese']}")
 
    if st.button("🏠 最初に戻る"):
        st.session_state.clear()
