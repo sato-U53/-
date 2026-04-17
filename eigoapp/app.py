@@ -58,11 +58,11 @@ def keyboard_handler():
 
        doc.onkeydown = function(e) {
            const key = e.key.toLowerCase();
-           if (key === 'i') pressButton('🔊');
+           if (key === 'p') pressButton('🔊');
            if (key === 'o') pressButton('👁️');
-           if (key === 'j') pressButton('〇');
-           if (key === 'k') pressButton('△');
-           if (key === 'l') pressButton('×');
+           if (key === 'k') pressButton('〇');
+           if (key === 'l') pressButton('△');
+           if (key === ';') pressButton('×');
        };
        </script>
        """,
