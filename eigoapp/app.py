@@ -82,10 +82,6 @@ st.markdown(
 .timer-text { font-size: 1.6rem; font-weight: bold; color: #e63946; text-align: center; }
 .grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
 
-@media (max-width: 768px) {
-   .word-box { padding: 16px; }
-   .word-box h1 { font-size: 1.8rem; }
-}
 </style>
 """,
    unsafe_allow_html=True
