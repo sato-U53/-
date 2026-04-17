@@ -240,19 +240,24 @@ elif st.session_state.status == "result":
    st.title("📊 結果報告")
    res = st.session_state.results
    total = sum(len(v) for v in res.values())
+
    if total > 0:
        acc = (len(res["〇"]) / total) * 100
        st.metric("正答率", f"{acc:.1f}%")
+       cols = st.columns(3)
+       cols[0].info(f"〇: {len(res['〇'])}")
+       cols[1].warning(f"△: {len(res['△'])}")
+       cols[2].error(f"×: {len(res['×'])}")
 
    st.write("---")
    cl, cr = st.columns(2)
    with cl:
        st.subheader("△ (復習)")
-       for i in res["△"]: st.write(f"・{i['english']} : {i['japanese']}")
+       for i in res["△"]: st.markdown(f"<div class='grid-item'>{i['english']} : {i['japanese']}</div>", unsafe_allow_html=True)
    with cr:
        st.subheader("× (要練習)")
-       for i in res["×"]: st.write(f"・{i['english']} : {i['japanese']}")
-          
+       for i in res["×"]: st.markdown(f"<div class='grid-item'>{i['english']} : {i['japanese']}</div>", unsafe_allow_html=True)
+
    st.write("---")
    retry = res["△"] + res["×"]
    if retry and st.button("🔄 不安な単語を再テスト", type="primary"):
@@ -263,6 +268,6 @@ elif st.session_state.status == "result":
        st.session_state.start_time = time.time()
        st.session_state.status = "testing"
        st.rerun()
-   if st.button("🏠 最初に戻る"):
+   if st.button("🏠 戻る"):
        st.session_state.clear()
        st.rerun()
