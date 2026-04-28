@@ -13,6 +13,44 @@ import streamlit.components.v1 as components
 # =====================================
 st.set_page_config(page_title="英単語テスト", layout="centered")
 
+def keyboard_handler():
+    components.html(
+        """
+        <script>
+        const doc = window.parent.document;
+        const keyState = {}; 
+
+        function pressButton(label) {
+            const buttons = Array.from(doc.querySelectorAll('button'));
+            const target = buttons.find(btn => {
+                const text = btn.innerText || "";
+                if (['〇', '△', '×'].includes(label)) return text.trim() === label;
+                return text.includes(label);
+            });
+            if (target) target.click();
+        }
+
+        doc.onkeydown = function(e) {
+            const key = e.key.toLowerCase();
+            if (keyState[key]) return; 
+            keyState[key] = true; 
+
+            if (key === 'p') pressButton('🔊');
+            if (key === 'o') pressButton('👁️');
+            if (key === 'k') pressButton('〇');
+            if (key === 'l') pressButton('△');
+            if (key === ';') pressButton('×');
+        };
+
+        doc.onkeyup = function(e) {
+            const key = e.key.toLowerCase();
+            keyState[key] = false; 
+        };
+        </script>
+        """,
+        height=0
+    )
+
 # =====================================
 # 音声再生
 # =====================================
