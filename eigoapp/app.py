@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import random
 import os
+from gtts import gTTS
+import base64
+import uuid
 import time
 import streamlit.components.v1 as components
 
@@ -10,99 +13,34 @@ import streamlit.components.v1 as components
 # =====================================
 st.set_page_config(page_title="英単語テスト", layout="centered")
 
-def keyboard_and_audio_handler():
-    components.html(
-        """
-        <script>
-        const doc = window.parent.document;
-        let isProcessing = false; // 連続動作防止フラグ
-        const keyStatus = {};    // キーの押し下げ状態管理
-
-        function speak(text) {
-            if (window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel(); // 前の音声を止めて即座に次を流す
-            }
-            const uttr = new SpeechSynthesisUtterance(text);
-            uttr.lang = 'en-US';
-            uttr.rate = 1.0;
-            window.speechSynthesis.speak(uttr);
-        }
-
-        function pressButton(label) {
-            if (isProcessing) return;
-            isProcessing = true;
-            
-            const buttons = Array.from(doc.querySelectorAll('button'));
-            const target = buttons.find(btn => {
-                const text = btn.innerText || "";
-                if (['〇', '△', '×'].includes(label)) return text.trim() === label;
-                return text.includes(label);
-            });
-            
-            if (target) {
-                target.click();
-            }
-            
-            // 0.5秒間は入力を受け付けない（連打・長押し対策）
-            setTimeout(() => { isProcessing = false; }, 500);
-        }
-
-        doc.onkeydown = function(e) {
-            const key = e.key.toLowerCase();
-            if (keyStatus[key]) return; // 押しっぱなしによる連続発火を防止
-            keyStatus[key] = true;
-
-            if (key === 'p') {
-                const wordElement = doc.querySelector('.word-text-main');
-                if (wordElement) speak(wordElement.innerText);
-            }
-            if (key === 'o') pressButton('👁️');
-            if (key === 'k') pressButton('〇');
-            if (key === 'l') pressButton('△');
-            if (key === ';') pressButton('×');
-        };
-
-        doc.onkeyup = function(e) {
-            const key = e.key.toLowerCase();
-            keyStatus[key] = false; // 指を離したらリセット
-        };
-
-        // ボタンのクリックイベントを奪取して誤動作を防ぐ
-        setInterval(() => {
-            const buttons = Array.from(doc.querySelectorAll('button'));
-            buttons.forEach(btn => {
-                if (btn.innerText.includes('🔊') && !btn.dataset.hooked) {
-                    btn.onclick = (e) => {
-                        e.preventDefault();
-                        const word = doc.querySelector('.word-text-main').innerText;
-                        speak(word);
-                    };
-                    btn.dataset.hooked = "true";
-                }
-            });
-        }, 500);
-        </script>
-        """,
-        height=0
-    )
+# =====================================
+# 音声再生
+# =====================================
+def speak(text: str):
+    filename = f"temp_{uuid.uuid4().hex}.mp3"
+    try:
+        tts = gTTS(text=text, lang="en")
+        tts.save(filename)
+        with open(filename, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        html = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
+        st.markdown(html, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"音声生成エラー: {e}")
+    finally:
+        if os.path.exists(filename):
+            try: os.remove(filename)
+            except: pass
 
 # =====================================
-# ブラウザ側で音声を鳴らすためのJSコンポーネント
+# 強力なキーボード操作用JavaScript (長押し防止)
 # =====================================
-def keyboard_and_audio_handler():
+def keyboard_handler():
     components.html(
         """
         <script>
         const doc = window.parent.document;
         
-        // 音声再生関数 (Web Speech API)
-        function speak(text) {
-            const uttr = new SpeechSynthesisUtterance(text);
-            uttr.lang = 'en-US';
-            uttr.rate = 1.0;
-            window.speechSynthesis.speak(uttr);
-        }
-
         function pressButton(label) {
             const buttons = Array.from(doc.querySelectorAll('button'));
             const target = buttons.find(btn => {
@@ -113,70 +51,67 @@ def keyboard_and_audio_handler():
             if (target) target.click();
         }
 
-        // キーボードイベント
         doc.onkeydown = function(e) {
+            if (e.repeat) return; // 長押し時は一回だけ
             const key = e.key.toLowerCase();
-            if (key === 'p') {
-                // Pキーで単語を読み上げ (Pythonを介さずJSで実行)
-                const wordElement = doc.querySelector('.word-text-main');
-                if (wordElement) speak(wordElement.innerText);
-            }
+            if (key === 'p') pressButton('🔊');
             if (key === 'o') pressButton('👁️');
             if (key === 'k') pressButton('〇');
             if (key === 'l') pressButton('△');
             if (key === ';') pressButton('×');
         };
-
-        // Streamlitのボタンをクリックした時にJS側で音声を出すためのフック
-        // 「🔊 音声」というテキストが含まれるボタンを探してイベントを奪う
-        setInterval(() => {
-            const buttons = Array.from(doc.querySelectorAll('button'));
-            const audioBtn = buttons.find(btn => btn.innerText.includes('🔊'));
-            if (audioBtn && !audioBtn.dataset.listenerAdded) {
-                audioBtn.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const word = doc.querySelector('.word-text-main').innerText;
-                    speak(word);
-                };
-                audioBtn.dataset.listenerAdded = "true";
-            }
-        }, 500);
         </script>
         """,
         height=0
     )
 
 # =====================================
-# CSS (ガタつきを徹底排除)
+# CSS (場所を固定してブレをなくす)
 # =====================================
 st.markdown(
     """
 <style>
-/* 高さを完全に固定 */
-.word-box { 
-    background-color: #f0f2f6; 
-    padding: 30px; 
-    border-radius: 15px; 
-    text-align: center; 
-    margin-bottom: 10px; 
-    border: 2px solid #ddd;
-    height: 140px; /* min-heightではなくheightで固定 */
+/* 単語・答えのエリアの高さを150pxで完全に固定 */
+.word-box, .answer-box, .answer-spacer { 
+    height: 150px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    border: 2px solid transparent;
+    overflow: hidden;
+}
+
+.word-box { background-color: #f0f2f6; border-color: #ddd; }
+.answer-box { background-color: #e3f2fd; border-color: #bbdefb; }
+.answer-spacer { background-color: transparent; } /* 答えがない時もこの高さを維持 */
+
+/* ヒントエリアも高さを固定 */
+.hint-container {
+    height: 80px;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.word-text-main { font-size: 2.5rem; font-weight: bold; margin: 0; }
-.ans-text-main { font-size: 1.8rem; font-weight: bold; color: #1565c0; margin: 0; }
+.hint-box { 
+    background-color: #fff3cd; 
+    padding: 10px 20px; 
+    border-radius: 10px; 
+    color: #856404; 
+    text-align: center;
+    width: 100%;
+}
 
-.hint-box { background-color: #fff3cd; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; color: #856404; height: 60px; overflow: hidden; }
 .stButton>button { height: 3.2em; font-size: 18px; border-radius: 10px; width: 100%; font-weight: bold; }
-
 .timer-text { font-size: 1.6rem; font-weight: bold; color: #e63946; text-align: center; }
 .grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
 
-/* Streamlit特有の余白を削る */
-.block-container { padding-top: 2rem !important; }
+@media (max-width: 768px) {
+    .word-box, .answer-box, .answer-spacer { height: 110px; }
+}
 </style>
 """,
     unsafe_allow_html=True
@@ -211,8 +146,7 @@ if st.session_state.status == "setting":
 
     if st.button("テスト開始！"):
         try:
-            current_dir = os.path.dirname(__file__)
-            csv_path = os.path.join(current_dir, csv_filename)
+            csv_path = os.path.join(os.path.dirname(__file__), csv_filename)
             df = pd.read_csv(csv_path, names=["no", "english", "japanese", "hint"])
             df["hint"] = df["hint"].fillna("").astype(str).str.strip()
             mask = (df["no"] >= start_no) & (df["no"] <= end_no)
@@ -237,7 +171,7 @@ if st.session_state.status == "setting":
 # テスト画面
 # =====================================
 elif st.session_state.status == "testing":
-    keyboard_and_audio_handler() # JSハンドラーを起動
+    keyboard_handler()
     
     total_q = len(st.session_state.test_list)
     idx = st.session_state.current_idx
@@ -255,24 +189,23 @@ elif st.session_state.status == "testing":
     col_main, col_ctrl = st.columns([7, 3])
 
     with col_main:
-        # JSから値を取得しやすいようにclass 'word-text-main' を付与
-        st.markdown(f"<div class='word-box'><h1 class='word-text-main'>{q['english']}</h1></div>", unsafe_allow_html=True)
+        # 単語表示（固定高）
+        st.markdown(f"<div class='word-box'><h1>{q['english']}</h1></div>", unsafe_allow_html=True)
         
-        # ヒントエリアの高さを固定
+        # ヒントエリア（固定高）
+        st.markdown("<div class='hint-container'>", unsafe_allow_html=True)
         if st.session_state.show_hint and has_hint:
             st.markdown(f"<div class='hint-box'>{hint_val}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div class='hint-box' style='background:transparent; border:none;'></div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
-        # 答えエリアの高さを固定
+        # 答えエリア（固定高：ここがブレない鍵）
         if st.session_state.show_ans:
-            st.markdown(f"<div class='word-box' style='background-color:#e3f2fd;'><h2 class='ans-text-main'>{q['japanese']}</h2></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='answer-box'><h2>{q['japanese']}</h2></div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='word-box' style='background:transparent; border:none;'></div>", unsafe_allow_html=True)
+            st.markdown("<div class='answer-spacer'></div>", unsafe_allow_html=True)
 
     with col_ctrl:
-        # このボタンはJS側でクリックイベントを横取りするので、Pythonの再実行は走りません
-        st.button("🔊 音声")
+        st.button("🔊 音声", on_click=lambda: speak(q["english"]))
         
         if not st.session_state.show_ans:
             if st.button("👁️ 答え", type="primary"):
@@ -285,6 +218,7 @@ elif st.session_state.status == "testing":
                 st.rerun()
 
         st.write("---")
+        # 判定ボタン
         c1, c2, c3 = st.columns(3)
         if c1.button("〇"):
             st.session_state.history.append("〇")
@@ -320,7 +254,7 @@ elif st.session_state.status == "testing":
             st.session_state.start_time = time.time()
             st.rerun()
         
-        if st.button("中止"):
+        if st.button("終了"):
             st.session_state.status = "result"
             st.rerun()
 
