@@ -66,14 +66,16 @@ def keyboard_handler():
     )
 
 # =====================================
-# CSS (場所を固定してブレをなくす)
+# CSS (長文対策・はみ出し＆隠れ防止強化版)
 # =====================================
 st.markdown(
     """
 <style>
-/* 単語・答えのエリアの高さを150pxで完全に固定 */
+/* 枠自体の最小高さを 180px に拡大し、縦に溢れた場合はスクロールできるようにする */
 .word-box, .answer-box, .answer-spacer { 
-    height: 150px; 
+    min-height: 180px;      /* 以前より高さを大きく確保してブレを防止 */
+    height: auto;
+    max-height: 260px;      /* 限界値を決めて下のボタンが潰れるのを防ぐ */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -81,12 +83,25 @@ st.markdown(
     margin-bottom: 10px;
     box-sizing: border-box;
     border: 2px solid transparent;
-    overflow: hidden;
+    padding: 20px;          /* 内側に十分な余白を作ってはみ出しを防ぐ */
+    overflow-y: auto;       /* 万が一限界を超えたら枠内でスクロール可能にする */
 }
 
 .word-box { background-color: #f0f2f6; border-color: #ddd; }
 .answer-box { background-color: #e3f2fd; border-color: #bbdefb; }
 .answer-spacer { background-color: transparent; } /* 答えがない時もこの高さを維持 */
+
+/* 答えの文字が絶対に溢れないように調整 */
+.answer-box h2 {
+    font-size: 1.35rem;     /* 文字サイズを少し抑えめに */
+    font-weight: bold;
+    margin: 0;
+    text-align: center;
+    line-height: 1.5;
+    word-break: break-word; /* 単語や文章の途中で綺麗に折り返す */
+    white-space: normal;    /* 自動折り返しを強制 */
+    width: 100%;
+}
 
 /* ヒントエリアも高さを固定 */
 .hint-container {
@@ -110,7 +125,8 @@ st.markdown(
 .grid-item { background: #f8f9fa; border: 1px solid #e5e7eb; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
 
 @media (max-width: 768px) {
-    .word-box, .answer-box, .answer-spacer { height: 110px; }
+    .word-box, .answer-box, .answer-spacer { min-height: 130px; }
+    .answer-box h2 { font-size: 1.15rem; } /* スマホではさらに文字を小さくして収める */
 }
 </style>
 """,
@@ -198,7 +214,7 @@ elif st.session_state.status == "testing":
             st.markdown(f"<div class='hint-box'>{hint_val}</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
         
-        # 答えエリア（固定高：ここがブレない鍵）
+        # 答えエリア（長文対応・はみ出さない仕様）
         if st.session_state.show_ans:
             st.markdown(f"<div class='answer-box'><h2>{q['japanese']}</h2></div>", unsafe_allow_html=True)
         else:
